@@ -11,6 +11,66 @@ Utilities for Dictionary-based Logging Parser
 import binascii
 
 
+ENCODING = "iso-8859-1"
+LOG_HEX_SEP = "##ZLOGV1##".encode(encoding=ENCODING)
+
+
+# TODO: better name?
+class UnhexlifyReader:
+    """TODO"""
+
+    def __init__(self, logfile, rawhex=False):
+        self._logfile = logfile
+        self._data_started = rawhex
+        self._marker = bytes()
+
+    def read(self, size=-1, /):
+        if size == 0:
+            return bytes()
+
+"""
+        if args.rawhex:
+            # Simply log file with only hexadecimal data
+            logdata = dictionary_parser.utils.convert_hex_file_to_bin(args.logfile)
+        else:
+            hexdata = ''
+
+            with open(args.logfile, "r", encoding="iso-8859-1") as hexfile:
+                for line in hexfile.readlines():
+                    hexdata += line.strip()
+
+            if LOG_HEX_SEP not in hexdata:
+                logger.error("ERROR: Cannot find start of log data, exiting...")
+                sys.exit(1)
+
+            idx = hexdata.index(LOG_HEX_SEP) + len(LOG_HEX_SEP)
+            hexdata = hexdata[idx:]
+
+            if len(hexdata) % 2 != 0:
+                # Make sure there are even number of characters
+                idx = int(len(hexdata) / 2) * 2
+                hexdata = hexdata[:idx]
+
+            idx = 0
+            while idx < len(hexdata):
+                # When running QEMU via west or ninja, there may be additional
+                # strings printed by QEMU, west or ninja (for example, QEMU
+                # is terminated, or user interrupted, etc). So we need to
+                # figure out where the end of log data stream by
+                # trying to convert from hex to bin.
+                idx += 2
+
+                try:
+                    binascii.unhexlify(hexdata[:idx])
+                except binascii.Error:
+                    idx -= 2
+                    break
+
+            logdata = binascii.unhexlify(hexdata[:idx])
+"""
+
+
+
 def convert_hex_file_to_bin(hexfile):
     """This converts a file in hexadecimal to binary"""
     bin_data = b''

@@ -262,12 +262,16 @@ class LogParserV3(LogParser):
                   hex_vals, hex_padding, chr_vals))
 
 
-    def parse_one_normal_msg(self, logdata, offset):
+    def parse_one_normal_msg(self, logfile):
         """Parse one normal log message and print the encoded message"""
         # Parse log message header
+        logdata = logfile.read(struct.calcsize(self.fmt_msg_hdr))
         domain_lvl, pkg_len, data_len, source_id = struct.unpack_from(self.fmt_msg_hdr,
-                                                                      logdata, offset)
-        offset += struct.calcsize(self.fmt_msg_hdr)
+                                                                      logdata)
+
+        # Read remaining part of message
+        logdata += logfile.read(pkg_len + data_len)
+        offset = struct.calcsize(self.fmt_msg_hdr)
 
         timestamp = struct.unpack_from(self.fmt_msg_timestamp, logdata, offset)[0]
         offset += struct.calcsize(self.fmt_msg_timestamp)
@@ -283,16 +287,13 @@ class LogParserV3(LogParser):
         level_str, color = get_log_level_str_color(level)
         source_id_str = self.database.get_log_source_string(domain_id, source_id)
 
-        # Skip over data to point to next message (save as return value)
-        next_msg_offset = offset + pkg_len + data_len
-
         # Offset from beginning of cbprintf_packaged data to end of va_list arguments
         offset_end_of_args = struct.unpack_from("B", logdata, offset)[0]
         offset_end_of_args *= self.data_types.get_sizeof(DataTypes.INT)
         offset_end_of_args += offset
 
         # Extra data after packaged log
-        extra_data = logdata[(offset + pkg_len):next_msg_offset]
+        extra_data = logdata[(offset + pkg_len):]
 
         # Number of appended strings in package
         num_packed_strings = struct.unpack_from("B", logdata, offset+1)[0]
@@ -348,31 +349,28 @@ class LogParserV3(LogParser):
             # Has hexdump data
             self.print_hexdump(extra_data, len(log_prefix), color)
 
-        # Point to next message
-        return next_msg_offset
+        # Return number of bytes read
+        return len(logdata)
 
 
-    def parse_log_data(self, logdata, debug=False):
+    def parse_log_data(self, logfile, debug=False):
         """Parse binary log data and print the encoded log messages"""
-        offset = 0
 
-        while offset < len(logdata):
+        while logfile:
             # Get message type
-            msg_type = struct.unpack_from(self.fmt_msg_type, logdata, offset)[0]
-            offset += struct.calcsize(self.fmt_msg_type)
+            logdata = logfile.read(struct.calcsize(self.fmt_msg_type))
+            msg_type = struct.unpack_from(self.fmt_msg_type, logdata)[0]
 
             if msg_type == MSG_TYPE_DROPPED:
-                num_dropped = struct.unpack_from(self.fmt_dropped_cnt, logdata, offset)
-                offset += struct.calcsize(self.fmt_dropped_cnt)
+                logdata = logfile.read(struct.calcsize(self.fmt_dropped_cnt))
+                num_dropped = struct.unpack_from(self.fmt_dropped_cnt, logdata)
 
                 print(f"--- {num_dropped} messages dropped ---")
 
             elif msg_type == MSG_TYPE_NORMAL:
-                ret = self.parse_one_normal_msg(logdata, offset)
+                ret = self.parse_one_normal_msg(logfile)
                 if ret is None:
                     return False
-
-                offset = ret
 
             else:
                 logger.error("------ Unknown message type: %s", msg_type)

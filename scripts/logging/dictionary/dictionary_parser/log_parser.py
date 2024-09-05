@@ -58,6 +58,6 @@ class LogParser(abc.ABC):
 
 
     @abc.abstractmethod
-    def parse_log_data(self, logdata, debug=False):
+    def parse_log_data(self, logfile, debug=False):
         """Parse log data"""
         return None
