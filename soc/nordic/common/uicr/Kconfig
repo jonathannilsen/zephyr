@@ -1,0 +1,86 @@
+# Copyright (c) 2025 Nordic Semiconductor ASA
+# SPDX-License-Identifier: Apache-2.0
+
+config NRF_HALTIUM_GENERATE_UICR
+	bool "Generate UICR"
+	depends on NRF_PLATFORM_HALTIUM
+
+if NRF_HALTIUM_GENERATE_UICR
+
+config NRF_HALTIUM_UICR_LOCK
+	bool "Lock the UICR"
+
+choice NRF_HALTIUM_UICR_APPROTECT_APPLICATION
+	bool "APPLICATION AP protection"
+	default NRF_HALTIUM_UICR_APPROTECT_APPLICATION_UNPROTECT
+
+config NRF_HALTIUM_UICR_APPROTECT_APPLICATION_UNPROTECT
+	bool "Enable all debugging"
+
+config NRF_HALTIUM_UICR_APPROTECT_APPLICATION_PROTECT
+	bool "Disable all debugging"
+
+endchoice
+
+choice NRF_HALTIUM_UICR_APPROTECT_RADIOCORE
+	bool "RADIOCORE AP protection"
+	default NRF_HALTIUM_UICR_APPROTECT_RADIOCORE_UNPROTECT
+
+config NRF_HALTIUM_UICR_APPROTECT_RADIOCORE_UNPROTECT
+	bool "Enable all debugging"
+
+config NRF_HALTIUM_UICR_APPROTECT_RADIOCORE_PROTECT
+	bool "Disable all debugging"
+
+endchoice
+
+choice NRF_HALTIUM_UICR_APPROTECT_CORESIGHT
+	bool "CORESIGHT AP protection"
+	default NRF_HALTIUM_UICR_APPROTECT_CORESIGHT_UNPROTECT
+
+config NRF_HALTIUM_UICR_APPROTECT_CORESIGHT_UNPROTECT
+	bool "Enable all debugging"
+
+config NRF_HALTIUM_UICR_APPROTECT_CORESIGHT_PROTECT
+	bool "Disable all debugging"
+
+endchoice
+
+config NRF_HALTIUM_UICR_ERASEPROTECT
+	bool "Prevent ERASEALL"
+
+config NRF_HALTIUM_UICR_PROTECTED_MEMORY
+	bool "Enable protected memory region"
+
+if NRF_HALTIUM_UICR_PROTECTED_MEMORY
+
+config NRF_HALTIUM_UICR_PROTECTED_MEMORY_SIZE
+	hex "Protected memory region size"
+	default 0
+
+endif
+
+config NRF_HALTIUM_UICR_ITS
+	bool "Enable Internal Trusted Storage"
+
+if NRF_HALTIUM_UICR_ITS
+
+config NRF_HALTIUM_UICR_ITS_ADDRESS
+	hex "ITS start address"
+	default 0
+
+config NRF_HALTIUM_UICR_ITS_APPLICATION_SIZE
+	hex "Size of the APPLICATION ITS region"
+	default 0
+
+config NRF_HALTIUM_UICR_ITS_RADIOCORE_SIZE
+	hex "Size of the RADIOCORE ITS region"
+	default 0
+
+endif
+
+config NRF_HALTIUM_UICR_PERIPHCONF
+	bool "Enable peripheral configuration"
+	default y
+
+endif

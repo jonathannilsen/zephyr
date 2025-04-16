@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 add_subdirectory_ifdef(CONFIG_RISCV_CORE_NORDIC_VPR vpr)
+add_subdirectory_ifdef(CONFIG_NRF_HALTIUM_GENERATE_UICR uicr)
 
 # Let SystemInit() be called in place of soc_reset_hook() by default.
 zephyr_linker_symbol(SYMBOL soc_reset_hook EXPR "@SystemInit@")
