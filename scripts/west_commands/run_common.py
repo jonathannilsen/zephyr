@@ -328,8 +328,8 @@ def do_run_common(command, user_args, user_runner_args, domain_file=None):
 
     # Reduce entries to only those having matching board names (either exact or with regex) and
     # remove any entries with empty board lists
-    for i, entry in enumerate(used_cmds):
-        for l, match in enumerate(entry.boards):
+    for i, entry in reversed(list(enumerate(used_cmds))):
+        for l, match in reversed(list(enumerate(entry.boards))):
             match_found = False
 
             # Check if there is a matching board for this regex
