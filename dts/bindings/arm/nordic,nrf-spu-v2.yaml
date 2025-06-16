@@ -1,0 +1,15 @@
+description: Nordic SPU (System Protection Unit) V2
+
+compatible: "nordic,nrf-spu-v2"
+
+include: base.yaml
+
+properties:
+  reg:
+    required: true
+
+  periph:
+    type: array
+
+  features:
+    type: array
