@@ -30,6 +30,10 @@ PERIPHCONF_NODELABEL = "periphconf_partition"
 ENABLED_VALUE = 0xFFFF_FFFF
 DISABLED_VALUE = 0xBD23_28A8
 
+# Recovery processor core enum values
+RECOVERY_PROCESSOR_APPLICATION = 0xBD2328A8
+RECOVERY_PROCESSOR_RADIOCORE = 0x1730C77F
+
 
 class ScriptError(RuntimeError): ...
 
@@ -196,6 +200,27 @@ def main() -> None:
             uicr.PERIPHCONF.ENABLE = ENABLED_VALUE
             uicr.PERIPHCONF.ADDRESS = periphconf_address
             uicr.PERIPHCONF.MAXCOUNT = math.floor(periphconf_size / 8)
+
+        # Configure RECOVERY field if enabled
+        if kconfig.get("CONFIG_NRF_HALTIUM_UICR_RECOVERY") == "y":
+            uicr.RECOVERY.ENABLE = ENABLED_VALUE
+
+            # Determine processor core from choice configuration
+            if kconfig.get("CONFIG_NRF_HALTIUM_UICR_RECOVERY_PROCESSOR_APPLICATION") == "y":
+                processor = RECOVERY_PROCESSOR_APPLICATION
+            elif kconfig.get("CONFIG_NRF_HALTIUM_UICR_RECOVERY_PROCESSOR_RADIOCORE") == "y":
+                processor = RECOVERY_PROCESSOR_RADIOCORE
+            else:
+                raise ScriptError("Unreachable code")
+            uicr.RECOVERY.PROCESSOR = processor
+
+            # Get and parse INITSVTOR address
+            initsvtor = int(kconfig.get("CONFIG_NRF_HALTIUM_UICR_RECOVERY_INITSVTOR"), 0)
+            uicr.RECOVERY.INITSVTOR = initsvtor
+
+            # Get and parse size in 4KB blocks
+            size4kb = int(kconfig.get("CONFIG_NRF_HALTIUM_UICR_RECOVERY_SIZE4KB"), 0)
+            uicr.RECOVERY.SIZE4KB = size4kb
 
         try:
             uicr_node = edt.label2node[UICR_NODELABEL]
