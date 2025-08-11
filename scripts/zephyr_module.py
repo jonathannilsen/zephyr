@@ -279,6 +279,8 @@ def process_sysbuildcmake(module, meta):
     module_yml = module_path.joinpath('zephyr/module.yml')
 
     cmake_extern = section.get('sysbuild-cmake-ext', False)
+    # hack to avoid having to update hal_nordic for proof of concept
+    cmake_extern = cmake_extern or module_path.parts[-3:] == ("modules", "hal", "nordic")
     if cmake_extern:
         return('\"{}\":\"{}\":\"{}\"\n'
                .format(meta['name'],
