@@ -1,0 +1,20 @@
+config NRF_HALTIUM_GENERATE_UICR
+	bool "Generate UICR file"
+	depends on SOC_SERIES_NRF54HX
+	default y
+	help
+	  Generate UICR HEX file.
+
+if NRF_HALTIUM_GENERATE_UICR
+
+config NRF_HALTIUM_UICR_PERIPHCONF
+	bool "Initialize global domain peripherals"
+	default y
+	help
+	  Generates a blob containing static global domain peripheral initialization
+	  values extracted from the build artifacts, and configures UICR.PERIPHCONF
+	  to point at the blob. The initialization values are then loaded ahead of
+	  ahead of the application boot.
+
+endif
+

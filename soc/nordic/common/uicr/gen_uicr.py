@@ -192,7 +192,7 @@ def main() -> None:
         padding_len = periphconf_size - len(periphconf_combined)
         periphconf_final = periphconf_combined + bytes([0xFF for _ in range(padding_len)])
 
-        if kconfig.get("CONFIG_NRF_HALTIUM_UICR_PERIPHCONF") == "y":
+        if kconfig.get("SB_CONFIG_NRF_HALTIUM_UICR_PERIPHCONF") == "y" or kconfig.get("CONFIG_NRF_HALTIUM_UICR_PERIPHCONF") == "y":
             uicr.PERIPHCONF.ENABLE = ENABLED_VALUE
             uicr.PERIPHCONF.ADDRESS = periphconf_address
             uicr.PERIPHCONF.MAXCOUNT = math.floor(periphconf_size / 8)

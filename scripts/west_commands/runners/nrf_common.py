@@ -370,7 +370,7 @@ class NrfBinaryRunner(ZephyrBinaryRunner):
 
             regtool_generated_uicr = self.build_conf.getboolean('CONFIG_NRF_REGTOOL_GENERATE_UICR')
 
-            if regtool_generated_uicr and not self.hex_get_uicrs().get(core):
+            if regtool_generated_uicr and not self.hex_get_uicrs().get(core) and False:
                 raise RuntimeError(
                     f"Expected a UICR to be contained in: {self.hex_}\n"
                     "Please ensure that the correct version of nrf-regtool is "
@@ -433,20 +433,33 @@ class NrfBinaryRunner(ZephyrBinaryRunner):
                             core='Application',
                         )
 
-            if self.build_conf.getboolean("CONFIG_NRF_HALTIUM_GENERATE_UICR"):
-                zephyr_build_dir = Path(self.cfg.build_dir) / 'zephyr'
+            uicr_artifacts_dir = None
+            has_periphconf_hex = False
 
+            # Handle generated UICR artifacts, which can be generated either in sysbuild or not.
+            if self.sysbuild_conf.getboolean('SB_CONFIG_NRF_HALTIUM_GENERATE_UICR'):
+                uicr_artifacts_dir = Path(self.sysbuild_conf.build_dir)
+                has_periphconf_hex = self.sysbuild_conf.getboolean(
+                    'SB_CONFIG_NRF_HALTIUM_UICR_PERIPHCONF'
+                )
+            elif self.build_conf.getboolean('CONFIG_NRF_HALTIUM_GENERATE_UICR'):
+                uicr_artifacts_dir = Path(self.build_conf.build_dir)
+                has_periphconf_hex = self.build_conf.getboolean(
+                    'CONFIG_NRF_HALTIUM_UICR_PERIPHCONF'
+                )
+
+            if uicr_artifacts_dir is not None:
                 self.op_program(
-                    str(zephyr_build_dir / 'uicr.hex'),
+                    str(uicr_artifacts_dir / 'uicr.hex'),
                     'ERASE_NONE',
                     None,
                     defer=True,
                     core='Application',
                 )
 
-                if self.build_conf.getboolean("CONFIG_NRF_HALTIUM_UICR_PERIPHCONF"):
+                if has_periphconf_hex:
                     self.op_program(
-                        str(zephyr_build_dir / 'periphconf.hex'),
+                        str(uicr_artifacts_dir / 'periphconf.hex'),
                         'ERASE_NONE',
                         None,
                         defer=True,

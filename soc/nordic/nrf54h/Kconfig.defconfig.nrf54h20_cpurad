@@ -14,4 +14,7 @@ config PM
 config POWER_DOMAIN
 	default y
 
+config NRF_REGTOOL_GENERATE_UICR
+	default y
+
 endif # SOC_NRF54H20_CPURAD

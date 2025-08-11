@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 menu "nrf-regtool options"
-	depends on SOC_SERIES_NRF92X
+	depends on SOC_SERIES_NRF92X || SOC_SERIES_NRF54HX
 
 config NRF_REGTOOL_GENERATE_UICR
 	bool "Generate UICR"
@@ -10,6 +10,14 @@ config NRF_REGTOOL_GENERATE_UICR
 	  Generate a UICR hex based on devicetree contents using nrf-regtool.
 	  CPU domains that require UICR allocation aren't bootable without it
 	  being programmed alongside the firmware.
+
+config NRF_REGTOOL_PERIPHCONF_MIGRATE
+	bool "Migrate UICR to PERIPHCONF"
+	default y
+	depends on NRF_REGTOOL_GENERATE_UICR
+	depends on NRF_PERIPHCONF_SECTION
+	help
+	  TODO
 
 config NRF_REGTOOL_VERBOSITY
 	int "Verbosity level of console output"
