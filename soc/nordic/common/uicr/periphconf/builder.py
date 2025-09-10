@@ -949,8 +949,16 @@ class GpiosProp:
     pin: int
 
 
+class SharedEnumRepr:
+    def __repr__(self) -> str:
+        return f"{self.name} ({self.value})"
+
+    def __str__(self) -> str:
+        return repr(self)
+
+
 @enum.unique
-class Ctrlsel(int, enum.Enum):
+class Ctrlsel(SharedEnumRepr, int, enum.Enum):
     """
     Enumeration of GPIO.PIN_CNF[n].CTRLSEL values.
     The list here may not be exhaustive.
@@ -970,7 +978,7 @@ class Ctrlsel(int, enum.Enum):
 CTRLSEL_DEFAULT = Ctrlsel.GPIO
 
 
-class NrfFun(int, enum.Enum):
+class NrfFun(SharedEnumRepr, int, enum.Enum):
     """Pin functions used with pinctrl, see include/zephyr/dt-bindings/pinctrl/nrf-pinctrl.h
     Only the functions relevant for CTRLSEL deduction have been included.
     """
@@ -1028,7 +1036,7 @@ class NrfFun(int, enum.Enum):
         return cls.ASSUMED_GPIO
 
 
-class NrfSaadcChannel(int, enum.Enum):
+class NrfSaadcChannel(SharedEnumRepr, int, enum.Enum):
     """Identifiers representing SAADC channels.
     See include/zephyr/dt-bindings/adc/nrf-saadc-haltium.h.
     """
@@ -1049,7 +1057,7 @@ class NrfSaadcChannel(int, enum.Enum):
     AIN13 = 14
 
 
-class NrfCompChannel(str, enum.Enum):
+class NrfCompChannel(SharedEnumRepr, str, enum.Enum):
     """Identifiers representing COMP/LPCOMP channels.
     See dts/bindings/comparator/nordic,nrf-comp.yaml.
     """
@@ -1162,7 +1170,7 @@ SPU_ADDRESS_BUS_REMAPPING = {
 
 
 @enum.unique
-class DomainId(enum.IntEnum):
+class DomainId(SharedEnumRepr, int, enum.Enum):
     """Domain IDs."""
 
     RESERVED = 0
@@ -1181,7 +1189,7 @@ class DomainId(enum.IntEnum):
 
 
 @enum.unique
-class OwnerId(enum.IntEnum):
+class OwnerId(SharedEnumRepr, int, enum.Enum):
     """Owner IDs."""
 
     NONE = 0
@@ -1197,7 +1205,7 @@ class OwnerId(enum.IntEnum):
 
 
 @enum.unique
-class ProcessorId(enum.IntEnum):
+class ProcessorId(SharedEnumRepr, int, enum.Enum):
     """Processor IDs."""
 
     SECURE = 1
@@ -1252,7 +1260,7 @@ class ProcessorId(enum.IntEnum):
 
 
 @enum.unique
-class AddressRegion(enum.IntEnum):
+class AddressRegion(SharedEnumRepr, int, enum.Enum):
     """Address regions, defined by Address Format of the data sheet."""
 
     PROGRAM = 0
@@ -1319,6 +1327,11 @@ class Address:
     def as_secure(self) -> Address:
         addr = Address(self)
         addr.security = True
+        return addr
+
+    def as_nonsecure(self) -> Address:
+        addr = Address(self)
+        addr.security = False
         return addr
 
     @property

@@ -99,6 +99,28 @@ if(CONFIG_GEN_UICR_GENERATE_PERIPHCONF)
   foreach(elf ${periphconf_elfs})
     list(APPEND periphconf_args --in-periphconf-elf ${elf})
   endforeach()
+
+  set(periphconf_check_cmd
+    ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/soc/nordic/common/uicr/check_periphconf.py
+    --in-periphconf-hex ${periphconf_hex_file}
+  )
+  if(CONFIG_GEN_UICR_VALIDATE)
+    add_custom_target(
+      periphconf_validate
+      COMMAND ${periphconf_check_cmd} --only-errors
+      DEPENDS ${periphconf_hex_file}
+    )
+  endif()
+  add_custom_target(
+    periphconf_dump
+    COMMAND ${periphconf_check_cmd} --print
+    DEPENDS ${periphconf_hex_file}
+  )
+  add_custom_target(
+    periphconf_dump_raw
+    COMMAND ${periphconf_check_cmd} --print --style raw
+    DEPENDS ${periphconf_hex_file}
+  )
 endif(CONFIG_GEN_UICR_GENERATE_PERIPHCONF)
 
 if(CONFIG_GEN_UICR_SECONDARY)
@@ -123,6 +145,28 @@ if(CONFIG_GEN_UICR_SECONDARY)
       list(APPEND secondary_args --in-secondary-periphconf-elf ${elf})
     endforeach()
   endif()
+
+  set(secondary_periphconf_check_cmd
+    ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/soc/nordic/common/uicr/check_periphconf.py
+    --in-periphconf-hex ${secondary_periphconf_hex_file}
+  )
+  if(CONFIG_GEN_UICR_VALIDATE)
+    add_custom_target(
+      secondary_periphconf_validate
+      COMMAND ${secondary_periphconf_check_cmd} --only-errors
+      DEPENDS ${secondary_periphconf_hex_file}
+    )
+  endif()
+  add_custom_target(
+    secondary_periphconf_dump
+    COMMAND ${secondary_periphconf_check_cmd} --print
+    DEPENDS ${secondary_periphconf_hex_file}
+  )
+  add_custom_target(
+    secondary_periphconf_dump_raw
+    COMMAND ${secondary_periphconf_check_cmd} --print --style raw
+    DEPENDS ${secondary_periphconf_hex_file}
+  )
 endif()
 
 # Generate hex files (merged, uicr-only, periphconf-only, and secondary-periphconf-only)
@@ -144,3 +188,13 @@ add_custom_command(
 add_subdirectory(zephyr)
 
 add_custom_target(gen_uicr ALL DEPENDS ${merged_hex_file} ${uicr_hex_file} ${periphconf_hex_file} ${secondary_periphconf_hex_file})
+
+# TODO: looks like periphconf_validate is always built even if periphconf.hex isn't rebuilt.
+# Should it be changed?
+if(CONFIG_GEN_UICR_VALIDATE AND CONFIG_GEN_UICR_GENERATE_PERIPHCONF)
+  add_dependencies(gen_uicr periphconf_validate)
+endif()
+
+if(CONFIG_GEN_UICR_VALIDATE AND CONFIG_GEN_UICR_GENERATE_SECONDARY_PERIPHCONF)
+  add_dependencies(gen_uicr secondary_periphconf_validate)
+endif()
