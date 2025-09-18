@@ -44,8 +44,82 @@ function(compute_partition_address_and_size partition_nodelabel output_address_v
   set(${output_size_var} ${partition_size} PARENT_SCOPE)
 endfunction()
 
+# Function to find the SoC binaries blob matching the target IronSide version
+function(find_soc_binaries_blob out_version out_path)
+  set(${out_version} "" PARENT_SCOPE)
+  set(${out_path} "" PARENT_SCOPE)
+
+  if(NOT WEST)
+    message("West is not installed. "
+            "UICR validation will be skipped due to missing artifacts."
+    )
+    return()
+  endif()
+
+  math(EXPR version_major "(${CONFIG_NRF_IRONSIDE_VERSION} >> 24) & 0xFF")
+  math(EXPR version_minor "(${CONFIG_NRF_IRONSIDE_VERSION} >> 16) & 0xFF")
+  math(EXPR version_patch "(${CONFIG_NRF_IRONSIDE_VERSION} >> 8) & 0xFF")
+  math(EXPR version_seqno "${CONFIG_NRF_IRONSIDE_VERSION} & 0xFF")
+
+  execute_process(
+    COMMAND
+      ${WEST} blobs list hal_nordic -f "{version}|{abspath}"
+    ERROR_QUIET
+    OUTPUT_VARIABLE blobs_list_output
+    RESULT_VARIABLE blobs_list_result
+  )
+  if(blobs_list_result)
+    message(WARNING "Failed to list blobs in hal_nordic. "
+                    "UICR validation will be skipped due to missing artifacts."
+    )
+    return()
+  endif()
+
+  string(REPLACE "\n" ";" blobs_list "${blobs_list_output}")
+  set(version_str "${version_major}.${version_minor}.${version_patch}-debug\\+${version_seqno}")
+  set(pattern "${version_str}\\|.+${CONFIG_SOC}_soc_binaries_v${version_str}\\.zip")
+
+  # TODO;: handle present/needs download flag
+  foreach(blobs_line IN LISTS blobs_list)
+    string(REGEX MATCH "${pattern}" match_out "${blobs_line}")
+    if(match_out)
+      string(REPLACE "|" ";" match_out "${match_out}")
+      list(GET match_out "0" matched_version)
+      list(GET match_out "1" matched_path)
+      set(${out_version} ${matched_version} PARENT_SCOPE)
+      set(${out_path} ${matched_path} PARENT_SCOPE)
+      return()
+    endif()
+  endforeach()
+
+  message(WARNING "SoC binaries ${version_str} blob was not found. "
+                  "Run 'west blobs fetch hal_nordic' to download the blob. "
+                  "UICR validation will be skipped due to missing artifacts."
+  )
+endfunction()
+
 # Use CMAKE_VERBOSE_MAKEFILE to silence an unused-variable warning.
 if(CMAKE_VERBOSE_MAKEFILE)
+endif()
+
+# Check if the SoC binaries / IronSide release zip of the targeted version
+# of IronSide is available. The release zip contains artifacts that are required for the validation.
+set(periphconf_registers_relative_json resources/periphconf_registers.json)
+set(periphconf_registers_json ${APPLICATION_BINARY_DIR}/${periphconf_registers_relative_json})
+
+if(CONFIG_GEN_UICR_VALIDATE)
+  find_soc_binaries_blob(soc_binaries_version soc_binaries_path)
+  message("SoC ${soc_binaries_version} at ${soc_binaries_path} will be used for validation")
+
+  add_custom_command(
+    OUTPUT ${periphconf_registers_json}
+    # TODO
+    # COMMAND ${CMAKE_COMMAND} -E make_directory soc_binaries
+    COMMAND ${CMAKE_COMMAND} -E tar x ${soc_binaries_path} ${periphconf_registers_relative_json}
+
+    WORKING_DIRECTORY ${APPLICATION_BINARY_DIR}
+    COMMENT "Extracting ${periphconf_registers_relative_json} from ${soc_binaries_path} to ${periphconf_registers_json}"
+  )
 endif()
 
 set(periphconf_args)
@@ -103,23 +177,28 @@ if(CONFIG_GEN_UICR_GENERATE_PERIPHCONF)
   set(periphconf_check_cmd
     ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/soc/nordic/common/uicr/check_periphconf.py
     --in-periphconf-hex ${periphconf_hex_file}
+    --in-periphconf-registers-json ${periphconf_registers_json}
+  )
+  set(periphconf_check_deps
+    ${periphconf_hex_file}
+    ${periphconf_registers_json}
   )
   if(CONFIG_GEN_UICR_VALIDATE)
     add_custom_target(
       periphconf_validate
       COMMAND ${periphconf_check_cmd} --only-errors
-      DEPENDS ${periphconf_hex_file}
+      DEPENDS ${periphconf_check_deps}
     )
   endif()
   add_custom_target(
     periphconf_dump
     COMMAND ${periphconf_check_cmd} --print
-    DEPENDS ${periphconf_hex_file}
+    DEPENDS ${periphconf_check_deps}
   )
   add_custom_target(
     periphconf_dump_raw
     COMMAND ${periphconf_check_cmd} --print --style raw
-    DEPENDS ${periphconf_hex_file}
+    DEPENDS ${periphconf_check_deps}
   )
 endif(CONFIG_GEN_UICR_GENERATE_PERIPHCONF)
 
@@ -149,23 +228,28 @@ if(CONFIG_GEN_UICR_SECONDARY)
   set(secondary_periphconf_check_cmd
     ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/soc/nordic/common/uicr/check_periphconf.py
     --in-periphconf-hex ${secondary_periphconf_hex_file}
+    --in-periphconf-registers-json ${periphconf_registers_json}
+  )
+  set(secondary_periphconf_check_deps
+    ${secondary_periphconf_hex_file}
+    ${periphconf_registers_json}
   )
   if(CONFIG_GEN_UICR_VALIDATE)
     add_custom_target(
       secondary_periphconf_validate
       COMMAND ${secondary_periphconf_check_cmd} --only-errors
-      DEPENDS ${secondary_periphconf_hex_file}
+      DEPENDS ${secondary_periphconf_check_deps}
     )
   endif()
   add_custom_target(
     secondary_periphconf_dump
     COMMAND ${secondary_periphconf_check_cmd} --print
-    DEPENDS ${secondary_periphconf_hex_file}
+    DEPENDS ${secondary_periphconf_check_deps}
   )
   add_custom_target(
     secondary_periphconf_dump_raw
     COMMAND ${secondary_periphconf_check_cmd} --print --style raw
-    DEPENDS ${secondary_periphconf_hex_file}
+    DEPENDS ${secondary_periphconf_check_deps}
   )
 endif()
 

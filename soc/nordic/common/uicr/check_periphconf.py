@@ -25,7 +25,6 @@ except ImportError:
         # TODO
         raise NotImplementedError()
 
-
 try:
     ZEPHYR_BASE = Path(os.environ["ZEPHYR_BASE"]).resolve()
 except KeyError:
@@ -54,6 +53,11 @@ def main() -> None:
         type=argparse.FileType("r", encoding="utf-8"),
         required=True,
     )
+    parser.add_argument(
+        "--in-periphconf-registers-json",
+        type=argparse.FileType("r", encoding="utf-8"),
+        required=True,
+    )
     parser.add_argument("--only-errors", action="store_true", default=False)
     parser.add_argument("--print", action="store_true", default=False, help="If set TODO")
     parser.add_argument(
@@ -69,8 +73,10 @@ def main() -> None:
     if len(ihex.segments()) > 1:
         sys.exit("Expected a PERIPHCONF HEX file containing a single contiguous data segment")
 
+    register_info = json.load(args.in_periphconf_registers_json)
+
     raw = ihex.tobinstr()
-    entries = parse_periphconf(raw)
+    entries = parse_periphconf(register_info,  raw)
     validate_status, validated_entries = validate_periphconf(entries)
     if args.only_errors:
         if not validate_status.is_error():

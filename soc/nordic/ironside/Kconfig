@@ -1,11 +1,86 @@
 # Copyright (c) 2025 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
+config HAS_NRF_IRONSIDE
+	bool
+	help
+	  This is selected by SoCs that run Nordic IronSide firmware.
+
+menu "Nordic IronSide"
+	depends on HAS_NRF_IRONSIDE
+
 config NRF_IRONSIDE
 	bool
-	depends on SOC_NRF54H20 || SOC_NRF9280_IRON
 	help
 	  This is selected by drivers interacting with Nordic IronSide firmware.
+
+choice
+	prompt "IronSide version target"
+	default NRF_IRONSIDE_VERSION_USE_DEFAULT
+	help
+	  Scheme used to determine the version of IronSide SE targeted by the application.
+
+config NRF_IRONSIDE_VERSION_USE_DEFAULT
+	bool "Target the default version"
+	help
+	  Target the version set as the default.
+
+config NRF_IRONSIDE_VERSION_USE_LATEST
+	bool "Target the latest version"
+	help
+	  Target the latest version available in hal_nordic.
+
+config NRF_IRONSIDE_VERSION_USE_FIXED
+	bool "Target a fixed version"
+	help
+	  Target a specific version as 
+
+endchoice
+
+# Specific IronSide SE versions are listed here.
+#
+# Format: hex( (major << 24) | (minor << 16) | (bugfix << 8) | (seqno) )
+#
+
+ironside_v23_0_99_127 := 0x1700637f
+
+config NRF_IRONSIDE_FIXED_VERSION
+	# TODO: would be way nicer to be able to input a string here...
+	hex "Fixed target version (hexadecimal encoded)"
+	default NRF_IRONSIDE_VERSION_DEFAULT
+	depends on NRF_IRONSIDE_VERSION_USE_FIXED
+	help
+	  The specific version of IronSide SE to target. It is recommended to set this
+	  so that the IronSide libraries and drivers know which version of IronSide SE
+	  you are using.
+	  The version is encoded as a hexadecimal value:
+	    hex((major << 24) | (minor << 16) | (bugfix << 8) | (seqno))
+
+config NRF_IRONSIDE_VERSION_LATEST
+	def_hex $(ironside_v23_0_99_127)
+	help
+	  Symbol containing the latest available version in hal_nordic.
+
+config NRF_IRONSIDE_VERSION_DEFAULT
+	def_hex $(ironside_v23_0_99_127)
+	help
+	  Symbol containing the default version used by samples and tests in zephyr.
+
+config NRF_IRONSIDE_VERSION
+	hex
+	default NRF_IRONSIDE_FIXED_VERSION if NRF_IRONSIDE_VERSION_USE_FIXED
+	default NRF_IRONSIDE_VERSION_LATEST if NRF_IRONSIDE_VERSION_USE_LATEST
+	default NRF_IRONSIDE_VERSION_DEFAULT # NRF_IRONSIDE_VERSION_USE_DEFAULT
+	help
+	  Helper symbol that contains the targeted IronSide SE version.
+
+# TODO: is this even possible?
+# config NRF_IRONSIDE_API_VERSION
+# 	def_hex $(div_hex,$(NRF_IRONSIDE_VERSION),0x10000)
+# 	hex
+# 	help
+# 	  Helper symbol that contains the upper 16 bits of the full target version.
+# 	  This is used to determine which APIs the version supports.
 
 config NRF_IRONSIDE_CALL
 	bool
@@ -27,8 +102,9 @@ config NRF_IRONSIDE_CALL_INIT_PRIORITY
 
 endif # NRF_IRONSIDE_CALL
 
-menu "Nordic IronSide services"
-	depends on SOC_NRF54H20 || SOC_NRF9280_IRON
+# TODO: is this menu needed?
+# menu "IronSide services"
+# 	depends on SOC_NRF54H20 || SOC_NRF9280_IRON
 
 config NRF_IRONSIDE_CPUCONF_SERVICE
 	bool "IronSide CPUCONF service"
@@ -79,5 +155,8 @@ config NRF_IRONSIDE_ABB_STATUSANA_CHECK_MAX_ATTEMPTS
 	  Maximum attempts with 10us intervals before busy status will be reported.
 
 endif # NRF_IRONSIDE_DVFS_SERVICE
+
+# TODO: should we ahve this menu?
+# endmenu
 
 endmenu

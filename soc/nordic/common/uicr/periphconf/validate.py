@@ -271,11 +271,7 @@ class ValidatedConf:
 REGPTR_MASK = 0xFFFF_FFFC
 
 
-def parse_periphconf(periphconf_raw: bytes) -> list[ConfEntry]:
-    # TODO: per-soc
-    with open(Path(__file__).parent / "nrf54h20_register_def.json") as f:
-        register_info = json.load(f)
-
+def parse_periphconf(register_info: dict, periphconf_raw: bytes) -> list[ConfEntry]:
     blob = []
 
     for i in range(0, len(periphconf_raw), 8):
