@@ -45,14 +45,13 @@ function(compute_partition_address_and_size partition_nodelabel output_address_v
 endfunction()
 
 # Function to find the SoC binaries blob matching the target IronSide version
-function(find_soc_binaries_blob out_version out_path)
+function(find_soc_binaries_blob out_status out_version out_abspath out_path)
+  set(${out_status} "" PARENT_SCOPE)
   set(${out_version} "" PARENT_SCOPE)
   set(${out_path} "" PARENT_SCOPE)
 
   if(NOT WEST)
-    message("West is not installed. "
-            "UICR validation will be skipped due to missing artifacts."
-    )
+    message("West is not installed.")
     return()
   endif()
 
@@ -63,7 +62,7 @@ function(find_soc_binaries_blob out_version out_path)
 
   execute_process(
     COMMAND
-      ${WEST} blobs list hal_nordic -f "{version}|{abspath}"
+      ${WEST} blobs list hal_nordic -f "{status}|{version}|{abspath}|{path}"
     ERROR_QUIET
     OUTPUT_VARIABLE blobs_list_output
     RESULT_VARIABLE blobs_list_result
@@ -77,23 +76,27 @@ function(find_soc_binaries_blob out_version out_path)
 
   string(REPLACE "\n" ";" blobs_list "${blobs_list_output}")
   set(version_str "${version_major}.${version_minor}.${version_patch}-debug\\+${version_seqno}")
-  set(pattern "${version_str}\\|.+${CONFIG_SOC}_soc_binaries_v${version_str}\\.zip")
+  set(pattern "[AMD]\\|${version_str}\\|.+${CONFIG_SOC}_soc_binaries_v${version_str}\\.zip\\|.*")
 
-  # TODO;: handle present/needs download flag
+  # TODO: handle present/needs download flag
   foreach(blobs_line IN LISTS blobs_list)
     string(REGEX MATCH "${pattern}" match_out "${blobs_line}")
     if(match_out)
       string(REPLACE "|" ";" match_out "${match_out}")
-      list(GET match_out "0" matched_version)
-      list(GET match_out "1" matched_path)
+      list(GET match_out "0" matched_status)
+      list(GET match_out "1" matched_version)
+      list(GET match_out "2" matched_abspath)
+      list(GET match_out "3" matched_path)
+      set(${out_status} ${matched_status} PARENT_SCOPE)
       set(${out_version} ${matched_version} PARENT_SCOPE)
+      set(${out_abspath} ${matched_abspath} PARENT_SCOPE)
       set(${out_path} ${matched_path} PARENT_SCOPE)
       return()
     endif()
   endforeach()
 
   message(WARNING "SoC binaries ${version_str} blob was not found. "
-                  "Run 'west blobs fetch hal_nordic' to download the blob. "
+                  "Check that the version is set correctly. "
                   "UICR validation will be skipped due to missing artifacts."
   )
 endfunction()
@@ -108,18 +111,44 @@ set(periphconf_registers_relative_json resources/periphconf_registers.json)
 set(periphconf_registers_json ${APPLICATION_BINARY_DIR}/${periphconf_registers_relative_json})
 
 if(CONFIG_GEN_UICR_VALIDATE)
-  find_soc_binaries_blob(soc_binaries_version soc_binaries_path)
-  message("SoC ${soc_binaries_version} at ${soc_binaries_path} will be used for validation")
-
-  add_custom_command(
-    OUTPUT ${periphconf_registers_json}
-    # TODO
-    # COMMAND ${CMAKE_COMMAND} -E make_directory soc_binaries
-    COMMAND ${CMAKE_COMMAND} -E tar x ${soc_binaries_path} ${periphconf_registers_relative_json}
-
-    WORKING_DIRECTORY ${APPLICATION_BINARY_DIR}
-    COMMENT "Extracting ${periphconf_registers_relative_json} from ${soc_binaries_path} to ${periphconf_registers_json}"
+  find_soc_binaries_blob(
+    soc_binaries_status
+    soc_binaries_version
+    soc_binaries_abspath
+    soc_binaries_path
   )
+
+  set(artifacts_ok FALSE)
+  if(soc_binaries_status STREQUAL "A")
+    set(artifacts_ok TRUE)
+    message("SoC binaries ${soc_binaries_version} at ${soc_binaries_path} will be used for validation")
+  elseif(soc_binaries_status STREQUAL "D")
+    message(WARNING "SoC binaries ${soc_binaries_version} at ${soc_binaries_path} "
+                    "must be downloaded for UICR validation to work. "
+                    "Run 'west blobs fetch hal_nordic -l ${soc_binaries_path}' to fetch the blob."
+    )
+    message()
+  elseif(soc_binaries_status STREQUAL "M")
+    message(WARNING "SoC binaries ${soc_binaries_version} at ${soc_binaries_path} hash fails "
+                    "verification. "
+    )
+  else()
+    message(WARNING "SoC binaries ${soc_binaries_version} at ${soc_binaries_path} has "
+                    "unknown blob status ${soc_binaries_status}"
+    )
+  endif()
+
+  if(artifacts_ok)
+    add_custom_command(
+      OUTPUT ${periphconf_registers_json}
+      COMMAND ${CMAKE_COMMAND} -E tar x ${soc_binaries_path} ${periphconf_registers_relative_json}
+
+      WORKING_DIRECTORY ${APPLICATION_BINARY_DIR}
+      COMMENT "Extracting ${periphconf_registers_relative_json} from ${soc_binaries_path} to ${periphconf_registers_json}"
+    )
+  else()
+    message(WARNING "UICR validation will be skipped due to missing artifacts.")
+  endif()
 endif()
 
 set(periphconf_args)
@@ -175,6 +204,7 @@ if(CONFIG_GEN_UICR_GENERATE_PERIPHCONF)
   endforeach()
 
   set(periphconf_check_cmd
+    ${CMAKE_COMMAND} -E env ZEPHYR_BASE=${ZEPHYR_BASE}
     ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/soc/nordic/common/uicr/check_periphconf.py
     --in-periphconf-hex ${periphconf_hex_file}
     --in-periphconf-registers-json ${periphconf_registers_json}
@@ -226,6 +256,7 @@ if(CONFIG_GEN_UICR_SECONDARY)
   endif()
 
   set(secondary_periphconf_check_cmd
+    ${CMAKE_COMMAND} -E env ZEPHYR_BASE=${ZEPHYR_BASE}
     ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/soc/nordic/common/uicr/check_periphconf.py
     --in-periphconf-hex ${secondary_periphconf_hex_file}
     --in-periphconf-registers-json ${periphconf_registers_json}

@@ -17,15 +17,6 @@ from typing import Any
 from intelhex import IntelHex
 
 try:
-    from tabulate import tabulate
-except ImportError:
-    print("Install the 'tabulate' package for a nicer table output", file=sys.stderr)
-
-    def tabulate(table: list, **kwargs: Any) -> str:
-        # TODO
-        raise NotImplementedError()
-
-try:
     ZEPHYR_BASE = Path(os.environ["ZEPHYR_BASE"]).resolve()
 except KeyError:
     sys.exit("Set the environment variable 'ZEPHYR_BASE' to point to the zephyr root directory")
@@ -44,6 +35,7 @@ from periphconf.validate import (
 
 
 def main() -> None:
+    # TODO: put some more thought into the CLI here.
     parser = argparse.ArgumentParser(
         allow_abbrev=False,
         description=("TODO"),
@@ -76,11 +68,12 @@ def main() -> None:
     register_info = json.load(args.in_periphconf_registers_json)
 
     raw = ihex.tobinstr()
-    entries = parse_periphconf(register_info,  raw)
+    entries = parse_periphconf(register_info, raw)
     validate_status, validated_entries = validate_periphconf(entries)
     if args.only_errors:
         if not validate_status.is_error():
-            # No errors, can exit early
+            # We are running in --only-errors mode and have no errors.
+            # Therefore we are done.
             return
         entries_to_print = [e for e in validated_entries if e.status.is_error()]
     else:

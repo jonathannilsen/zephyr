@@ -14,73 +14,79 @@ config NRF_IRONSIDE
 	help
 	  This is selected by drivers interacting with Nordic IronSide firmware.
 
+# Specific IronSide SE versions are listed here.
+# Each version is listed both in string format and hexadecimal format.
+# Hexadecimal format: hex( (major << 24) | (minor << 16) | (bugfix << 8) | (seqno) )
+#
+# When integrating a new version:
+#
+# * Add v<version>_str and v<version>_hex variables below this.
+# * Update latest_version_str:
+#     latest_version_str := "$(v<version>_str)".
+# * Add a default case to NRF_IRONSIDE_VERSION that maps the string to the hex value:
+#     default v<version>_hex if NRF_IRONSIDE_VERSION_STRING = "$(v<version>_str)".
+
+v23_0_99_127_str := 23.0.99+127
+v23_0_99_127_hex := 0x1700637f
+
+default_version_str := $(v23_0_99_127_str)
+latest_version_str := $(v23_0_99_127_str)
+
+config NRF_IRONSIDE_VERSION
+	hex
+	default $(v23_0_99_127_hex) if NRF_IRONSIDE_VERSION_STRING = "$(v23_0_99_127_str)"
+	default 0 # Invalid/unknown version
+	help
+	  Helper symbol that contains the targeted IronSide SE version, in hexadecimal format.
+
+config NRF_IRONSIDE_VERSION_IS_KNOWN
+	def_bool NRF_IRONSIDE_VERSION != 0
+	help
+	  Helper symbol that indicates if the targeted IronSide SE version is valid/known.
+
 choice
-	prompt "IronSide version target"
+	prompt "Target IronSide version"
 	default NRF_IRONSIDE_VERSION_USE_DEFAULT
 	help
 	  Scheme used to determine the version of IronSide SE targeted by the application.
+	  The target version is used to determine which APIs are supported and for choosing
+	  the correct IronSide release blob.
 
 config NRF_IRONSIDE_VERSION_USE_DEFAULT
-	bool "Target the default version"
+	bool "Target the default version [$(default_version_str)]"
 	help
-	  Target the version set as the default.
+	  Target the version set as the default. This is the version that is used for
+	  general zephyr development.
 
 config NRF_IRONSIDE_VERSION_USE_LATEST
-	bool "Target the latest version"
+	bool "Target the latest version [$(latest_version_str)]"
 	help
-	  Target the latest version available in hal_nordic.
+	  Target the latest version available to in hal_nordic. This version supports
+	  the latest IronSide features.
 
 config NRF_IRONSIDE_VERSION_USE_FIXED
 	bool "Target a fixed version"
 	help
-	  Target a specific version as 
+	  Target a specific version. It is recommended to use this option
+	  in your application so that the IronSide libraries, drivers
+	  and build system know which version of IronSide SE you are using.
 
 endchoice
 
-# Specific IronSide SE versions are listed here.
-#
-# Format: hex( (major << 24) | (minor << 16) | (bugfix << 8) | (seqno) )
-#
-
-ironside_v23_0_99_127 := 0x1700637f
-
 config NRF_IRONSIDE_FIXED_VERSION
-	# TODO: would be way nicer to be able to input a string here...
-	hex "Fixed target version (hexadecimal encoded)"
-	default NRF_IRONSIDE_VERSION_DEFAULT
+	string "IronSide version to target"
 	depends on NRF_IRONSIDE_VERSION_USE_FIXED
+	default "$(default_version_str)"
 	help
-	  The specific version of IronSide SE to target. It is recommended to set this
-	  so that the IronSide libraries and drivers know which version of IronSide SE
-	  you are using.
-	  The version is encoded as a hexadecimal value:
-	    hex((major << 24) | (minor << 16) | (bugfix << 8) | (seqno))
+	  The specific version of IronSide SE to target.
 
-config NRF_IRONSIDE_VERSION_LATEST
-	def_hex $(ironside_v23_0_99_127)
-	help
-	  Symbol containing the latest available version in hal_nordic.
-
-config NRF_IRONSIDE_VERSION_DEFAULT
-	def_hex $(ironside_v23_0_99_127)
-	help
-	  Symbol containing the default version used by samples and tests in zephyr.
-
-config NRF_IRONSIDE_VERSION
-	hex
+config NRF_IRONSIDE_VERSION_STRING
+	string
 	default NRF_IRONSIDE_FIXED_VERSION if NRF_IRONSIDE_VERSION_USE_FIXED
-	default NRF_IRONSIDE_VERSION_LATEST if NRF_IRONSIDE_VERSION_USE_LATEST
-	default NRF_IRONSIDE_VERSION_DEFAULT # NRF_IRONSIDE_VERSION_USE_DEFAULT
+	default "$(latest_version_str)" if NRF_IRONSIDE_VERSION_USE_LATEST
+	default "$(default_version_str)" if NRF_IRONSIDE_VERSION_USE_DEFAULT
 	help
-	  Helper symbol that contains the targeted IronSide SE version.
-
-# TODO: is this even possible?
-# config NRF_IRONSIDE_API_VERSION
-# 	def_hex $(div_hex,$(NRF_IRONSIDE_VERSION),0x10000)
-# 	hex
-# 	help
-# 	  Helper symbol that contains the upper 16 bits of the full target version.
-# 	  This is used to determine which APIs the version supports.
+	  Helper symbol that contains the targeted IronSide SE version, in string format.
 
 config NRF_IRONSIDE_CALL
 	bool
@@ -101,10 +107,6 @@ config NRF_IRONSIDE_CALL_INIT_PRIORITY
 	  but higher than the priority of any feature that selects NRF_IRONSIDE_CALL.
 
 endif # NRF_IRONSIDE_CALL
-
-# TODO: is this menu needed?
-# menu "IronSide services"
-# 	depends on SOC_NRF54H20 || SOC_NRF9280_IRON
 
 config NRF_IRONSIDE_CPUCONF_SERVICE
 	bool "IronSide CPUCONF service"
@@ -155,8 +157,5 @@ config NRF_IRONSIDE_ABB_STATUSANA_CHECK_MAX_ATTEMPTS
 	  Maximum attempts with 10us intervals before busy status will be reported.
 
 endif # NRF_IRONSIDE_DVFS_SERVICE
-
-# TODO: should we ahve this menu?
-# endmenu
 
 endmenu

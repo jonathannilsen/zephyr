@@ -6,7 +6,6 @@ SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
 import enum
-import json
 import re
 from dataclasses import dataclass
 from enum import Enum, Flag
@@ -28,6 +27,12 @@ except ImportError:
 
 @enum.unique
 class ValidationStatus(Flag):
+    """Status returned on validation of a PERIPHCONF entry.
+    SUCCESS indicates no errors, any other value indicates an error.
+
+    Multiple error statuses can be set simultaneously.
+    """
+
     SUCCESS = 0
 
     CONFLICTING_VALUES_NON_FATAL = enum.auto()
@@ -45,14 +50,18 @@ class ValidationStatus(Flag):
     MEMCONF_POWER_REGION_NOT_PRESENT = enum.auto()
 
     def is_error(self) -> bool:
+        """Check if any error status is set."""
         return self != ValidationStatus.SUCCESS
 
     def is_fatal_error(self) -> bool:
+        """Check if any fatal error status (an error that prevents normal boot) is set."""
         fatal = self & ~ValidationStatus.CONFLICTING_VALUES_NON_FATAL
         return fatal.is_error()
 
 
 class RegType(Enum):
+    """Represents the types of peripheral registers that can be configured through PERIPHCONF."""
+
     GPIO_PIN_CNF = enum.auto()
     IPCMAP_CHANNEL_SINK = enum.auto()
     IPCMAP_CHANNEL_SOURCE = enum.auto()
@@ -115,8 +124,9 @@ class ConfEntry:
             raise ValueError()
         return self.info["default"] & self.info["mask"]
 
+    # TODO: fix the type returned
     @cached_property
-    def reg_type_props(self) -> Any:
+    def reg_type_props(self) -> tuple[RegType, str, str | int] | None:
         if self.info is None:
             return None
 
@@ -185,19 +195,24 @@ class ConfEntry:
         return (reg_type, data.periph, *data.array_indices)
 
     def _parse_name(self, path_str: str) -> PathData | None:
-        # All paths start with {}
+        """Parse a peripheral register path into parts.
+        The path_str uses its own syntax for convenience, see _make_path_pattern for details.
+        """
         path_pattern = _make_path_pattern(path_str)
         if match := re.fullmatch(path_pattern, self.name):
             groups = match.groups()
             return PathData(groups[0], [int(s) for s in groups[1:]])
 
     def conf_field_equals_default(self, field_name: str) -> bool:
+        """Returns true if the value in the entry for the field equals the default value."""
         return self.get_conf_field(field_name) == self.get_default_field(field_name)
 
     def get_conf_field(self, field_name: str) -> int:
+        """Get the value set in the entry for the field."""
         return self._get_field(field_name, self.value)
 
     def get_default_field(self, field_name: str) -> int:
+        """Get the default value of the field."""
         if self.info is None:
             raise ValueError()
         return self._get_field(field_name, self.info["default"])
@@ -213,6 +228,7 @@ class ConfEntry:
 
     @cached_property
     def fields(self) -> str:
+        # TODO
         if self.info is None:
             raise ValueError()
 
@@ -243,6 +259,15 @@ class ConfEntry:
 
 @lru_cache
 def _make_path_pattern(path_str: str) -> str:
+    r"""Create a regex that matches a peripheral register name as defined by the path_str.
+    Escapes '.'-characters, replaces instances of {0} with a pattern matching an array index
+    like [123], and adds a pattern matching a peripheral name at the start.
+
+    For example:
+      "PERIPH{0}.PERM"
+    becomes:
+      r"^([^\.]+)\.PERIPH\[([0-9]+)\]\.PERM"
+    """
     path_pattern = path_str.format(r"\[([0-9]+)\]")
     path_pattern = path_pattern.replace(".", r"\.")
     path_pattern = r"^([^\.]+)\." + path_pattern + "$"
@@ -255,12 +280,7 @@ class PathData:
     array_indices: list[int]
 
 
-class ConfList(list[ConfEntry]):
-    def pretty_print(self) -> str:
-        # TODO
-        ...
-
-
+# TODO: combine this with conf?
 @dataclass
 class ValidatedConf:
     index: int
@@ -272,6 +292,7 @@ REGPTR_MASK = 0xFFFF_FFFC
 
 
 def parse_periphconf(register_info: dict, periphconf_raw: bytes) -> list[ConfEntry]:
+    """TODO"""
     blob = []
 
     for i in range(0, len(periphconf_raw), 8):
@@ -288,6 +309,7 @@ def parse_periphconf(register_info: dict, periphconf_raw: bytes) -> list[ConfEnt
 
 
 def validate_periphconf(conf_list: list[ConfEntry]) -> tuple[ValidationStatus, list[ValidatedConf]]:
+    """Validate the entries in the list of PERIPHCONF entries."""
     status_combined = ValidationStatus.SUCCESS
 
     indexed_confs = [ValidatedConf(i, c) for i, c in enumerate(conf_list)]
@@ -311,6 +333,13 @@ def validate_periphconf(conf_list: list[ConfEntry]) -> tuple[ValidationStatus, l
 
 
 def check_if_conflicting_values(indexed_regptr_confs: list[ValidatedConf]) -> ValidationStatus:
+    """Check if the entries, which all target the same register, have values that conflict.
+    A conflict is reported whenever the values are different, because the PERIPHCONF is designed
+    so that none of the exposed registers require multiple entries.
+    The function separates the conflicts into fatal and non-fatal, where fatal conflicts are those
+    that lead to a boot error.
+    """
+
     if len(indexed_regptr_confs) < 2:
         # Need at least two confs to have a conflict
         return ValidationStatus.SUCCESS
@@ -329,6 +358,7 @@ def check_if_conflicting_values(indexed_regptr_confs: list[ValidatedConf]) -> Va
     reg_type = indexed_regptr_confs[0].conf.reg_type_props[0]
 
     if reg_type.is_spu_register():
+        # SPU registers are locked upon first configuration
         status = ValidationStatus.CONFLICTING_VALUES_FATAL
     else:
         status = ValidationStatus.CONFLICTING_VALUES_NON_FATAL
@@ -340,9 +370,13 @@ def check_if_conflicting_values(indexed_regptr_confs: list[ValidatedConf]) -> Va
 
 
 def check_if_unrecognized_register(vconf: ValidatedConf) -> ValidationStatus:
+    """Check if the entry points to an unsupported/invalid register."""
+
     if vconf.conf.info is not None:
         return ValidationStatus.SUCCESS
 
+    # We assume that we have already loaded the info for the supported registers,
+    # so if the entry has no info, then it is not supported.
     status = ValidationStatus.UNRECOGNIZED_REGISTER
     vconf.status |= status
 
@@ -350,11 +384,16 @@ def check_if_unrecognized_register(vconf: ValidatedConf) -> ValidationStatus:
 
 
 def check_if_unimplemented_register(vconf: ValidatedConf) -> ValidationStatus:
+    """Check if the entry points to a register that is valid but not implemented in the hardware.
+    Such registers typically read as zero regardless of the value written, which causes a readback
+    error when the PERIPHCONF is applied.
+    """
+
     match vconf.conf.reg_type_props:
         case (RegType.IPCMAP_CHANNEL_SINK, *_) | (RegType.IPCMAP_CHANNEL_SOURCE, *_) | None:
             # All IPCMAP registers are implemented.
             # If type is None then the register is not recognized, so we don't report an error
-            # here but rather through different checks
+            # here but through the other checks.
             return ValidationStatus.SUCCESS
         case (RegType.PPIB_PUBLISH_RECEIVE, *_) | (RegType.PPIB_SUBSCRIBE_SEND, *_):
             # These don't completely follow the rule below, so we exempt them here for now.
@@ -375,6 +414,7 @@ def check_if_unimplemented_register(vconf: ValidatedConf) -> ValidationStatus:
 
 
 def check_if_invalid_register_config(vconf: ValidatedConf) -> ValidationStatus:
+    """Does register specific checks to see if the entry value is invalid for that register."""
     status_combined = ValidationStatus.SUCCESS
     conf = vconf.conf
 
@@ -385,14 +425,12 @@ def check_if_invalid_register_config(vconf: ValidatedConf) -> ValidationStatus:
                 SpuPermDma.NO_SEPARATE_ATTRIBUTE,
             )
             if fixed_dmasec and not conf.conf_field_equals_default("DMASEC"):
-                # TODO: complain about not programmable DMA
                 status = ValidationStatus.SPU_PERM_DMASEC_NOT_APPLICABLE
                 vconf.status |= status
                 status_combined |= status
 
             fixed_owner = not conf.get_default_field("OWNERPROG")
             if fixed_owner and not conf.conf_field_equals_default("OWNERID"):
-                # TODO: complain about not programmable Owner
                 status = ValidationStatus.SPU_PERM_OWNERID_NOT_APPLICABLE
                 vconf.status |= status
                 status_combined |= status
@@ -401,14 +439,12 @@ def check_if_invalid_register_config(vconf: ValidatedConf) -> ValidationStatus:
                 conf.get_default_field("SECUREMAPPING") != SpuPermSecuremapping.USER_SELECTABLE
             )
             if fixed_secattr and not conf.conf_field_equals_default("SECATTR"):
-                # TODO: complain about not programmable SECATTR
                 status = ValidationStatus.SPU_PERM_SECATTR_NOT_APPLICABLE
                 vconf.status |= status
                 status_combined |= status
 
             is_locked = bool(conf.get_default_field("LOCK"))
             if is_locked and conf.masked_value != conf.masked_default_value:
-                # TODO: complain about LOCKed register not being mutable
                 status = ValidationStatus.SPU_REGISTER_LOCKED
                 vconf.status |= status
                 status_combined |= status
@@ -431,7 +467,6 @@ def check_if_invalid_register_config(vconf: ValidatedConf) -> ValidationStatus:
         ):
             is_locked = bool(conf.get_default_field("LOCK"))
             if is_locked and conf.masked_value != conf.masked_default_value:
-                # TODO: complain about LOCKed register not being mutable
                 status = ValidationStatus.SPU_REGISTER_LOCKED
                 vconf.status |= status
                 status_combined |= status
@@ -446,7 +481,6 @@ def check_if_invalid_register_config(vconf: ValidatedConf) -> ValidationStatus:
             # not implemented/programmable.
             conf_bad_bits = (conf.masked_value ^ conf.masked_default_value) & conf.mask
             if conf_bad_bits:
-                # TODO: complain about bits not being writable
                 status = ValidationStatus.MEMCONF_POWER_REGION_NOT_PRESENT
                 vconf.status |= status
                 status_combined |= status
@@ -454,7 +488,25 @@ def check_if_invalid_register_config(vconf: ValidatedConf) -> ValidationStatus:
     return status_combined
 
 
+class SpuPermSecuremapping(int, Enum):
+    """Enum values used in the SPU PERIPH[n].PERM SECUREMAPPING field"""
+
+    NONSECURE = 0
+    SECURE = 1
+    USER_SELECTABLE = 2
+    SPLIT = 3
+
+
+class SpuPermDma(int, Enum):
+    """Enum values used in the SPU PERIPH[n].PERM DMA field"""
+
+    NO_DMA = 0
+    NO_SEPARATE_ATTRIBUTE = 1
+    SEPARATE_ATTRIBUTE = 2
+
+
 def render_periphconf_table(entries: list[ValidatedConf], style: str = "regs") -> str:
+    """Render validated PERIPHCONF entries in table form."""
     table = []
     for entry in entries:
         error_char = "X" if entry.status != ValidationStatus.SUCCESS else ""
@@ -478,6 +530,7 @@ def render_periphconf_table(entries: list[ValidatedConf], style: str = "regs") -
 
 
 def render_validation_status(status: ValidationStatus) -> str:
+    """Render descriptions of each status flag in the combined status."""
     lines = []
 
     for present_status in status:
@@ -489,7 +542,13 @@ def render_validation_status(status: ValidationStatus) -> str:
     return "\n".join(lines)
 
 
+def fmt_addr(addr: int) -> str:
+    """Format an address in a readable way."""
+    return f"0x{addr:09_x}"
+
+
 VALIDATION_STATUS_DESCRIPTIONS = {
+    # This is here for completeness
     ValidationStatus.SUCCESS: "No errors",
     ValidationStatus.CONFLICTING_VALUES_NON_FATAL: dedent(
         """\
@@ -552,173 +611,3 @@ VALIDATION_STATUS_DESCRIPTIONS = {
         error, preventing the device from booting normally."""
     ),
 }
-
-
-from collections import defaultdict
-
-from .builder import (
-    Address,
-    ProcessorId,
-    EDT,
-    dt_reg_addr,
-    dt_node_identifier,
-    get_spu_addr_for_periph,
-)
-
-
-def conf_describe(conf: ConfEntry, dt: EDT | None = None) -> str | None:
-    # TODO: make this a common feature
-    periph_lookup = {}
-    if dt is not None:
-        for node in dt.nodes:
-            for reg in node.regs:
-                periph_lookup[reg.addr] = dt_node_identifier(node)
-
-    match conf.reg_type_props:
-        case (RegType.SPU_PERIPH_PERM, spu, slave_index):
-            periph_addr = Address(conf.regptr)
-            periph_addr.slave_index = slave_index
-            periph_addr.address_space = 0
-            periph_name = lookup_periph_name(periph_lookup, periph_addr)
-            return f"{periph_name} permissions"
-
-        case (RegType.SPU_FEATURE_BELLS_PROCESSOR_TASKS, spu, processor_raw, idx):
-            processor = ProcessorId(processor_raw)
-            # FIXME: this affects more than just one register
-            return f"{processor.name} BELLBOARD TASK {idx}"
-
-        case (RegType.SPU_FEATURE_BELLS_PROCESSOR_EVENTS, spu, processor_raw, idx):
-            processor = ProcessorId(processor_raw)
-            # FIXME: this affects more than just one register
-            return f"{processor.name} BELLBOARD EVENT {idx}"
-
-        case (RegType.SPU_FEATURE_BELLS_PROCESSOR_INTERRUPT, spu, processor_raw, idx):
-            processor = ProcessorId(processor_raw)
-            # FIXME: this affects more than just one register??
-            return f"{processor.name} BELLBOARD INTERRUPT {idx}"
-
-        case (RegType.SPU_FEATURE_DPPIC_CH, spu, channel):
-            spu_addr = Address(conf.regptr)
-            spu_addr.address_space = 0
-            dppic_name = lookup_name_by_spu(spu_addr, _DPPICS)
-            return f"{dppic_name} CH{channel} permissions"
-
-        case (RegType.SPU_FEATURE_DPPIC_CHG, spu, channel_group):
-            spu_addr = Address(conf.regptr)
-            spu_addr.address_space = 0
-            dppic_name = lookup_name_by_spu(spu_addr, _DPPICS)
-            return f"{dppic_name} CHG{channel_group} permissions"
-
-        case (RegType.SPU_FEATURE_GPIO_PIN, spu, port, pin):
-            return f"P{port}.{pin} permissions"
-
-        case (RegType.SPU_FEATURE_GPIOTE_CH, spu, gpiote_idx, channel):
-            # TODO: use indes
-            return f"GPIOTE CH{channel} permissions"
-
-        case (RegType.SPU_FEATURE_GPIOTE_INTERRUPT, spu, gpiote_idx, interrupt_idx):
-            return f"GPIOTE13{gpiote_idx} INT{interrupt_idx} permissions"
-
-        case (RegType.SPU_FEATURE_GRTC_CC, spu, channel):
-            return f"GRTC CC{channel} permissions"
-
-        case (RegType.SPU_FEATURE_GRTC_CLK, spu):
-            return "GRTC CLK permissions"
-
-        case (RegType.SPU_FEATURE_GRTC_SYSCOUNTER, spu):
-            return "GRTC SYSCOUNTER permissions"
-
-        case (RegType.SPU_FEATURE_GRTC_INTERRUPT, spu, interrupt_idx):
-            return f"GRTC INT{interrupt_idx} permissions"
-
-        case (RegType.SPU_FEATURE_IPCT_CH, spu, channel):
-            spu_addr = Address(conf.regptr)
-            spu_addr.address_space = 0
-            ipct_name = lookup_name_by_spu(spu_addr, _IPCTS)
-            return f"{ipct_name} CH{channel} permissions"
-
-        case (RegType.SPU_FEATURE_IPCT_INTERRUPT, spu, interrupt_idx):
-            spu_addr = Address(conf.regptr)
-            spu_addr.address_space = 0
-            ipct_name = lookup_name_by_spu(spu_addr, _IPCTS)
-            return f"{ipct_name} INT{interrupt_idx} permissions"
-
-        case (RegType.IPCMAP_CHANNEL_SINK, _, channel):
-            return f"IPCMAP CH{channel} sink domain"
-
-        case (RegType.IPCMAP_CHANNEL_SOURCE, _, channel):
-            return f"IPCMAP CH{channel} source domain"
-
-        case (RegType.IRQMAP_IRQ_SINK, _, interrupt):
-            ...
-
-        case (RegType.MEMCONF_POWER_CONTROL, memconf, _):
-            ...
-
-        case (RegType.MEMCONF_POWER_RET, memconf, _):
-            ...
-
-        case (RegType.MEMCONF_POWER_RET2, memconf, _):
-            ...
-
-        case (RegType.PPIB_SUBSCRIBE_SEND, ppib, channel):
-            ...
-
-        case (RegType.PPIB_PUBLISH_RECEIVE, ppib, channel):
-            ...
-
-        case (RegType.GPIO_PIN_CNF, gpio, pin):
-            ...
-
-        case _:
-            raise NotImplementedError()
-
-
-def lookup_name_by_spu(spu_addr: Address | int, periphs: dict[int, str]) -> str:
-    for addr, name in periphs.items():
-        if get_spu_addr_for_periph(addr) == spu_addr:
-            return name
-    raise NotImplementedError()
-
-
-# TODO: take from somewhere else
-_DPPICS = {
-    0x5F8E_1000: "DPPIC120",
-    0x5F92_2000: "DPPIC130",
-    0x5F98_1000: "DPPIC131",
-    0x5F99_1000: "DPPIC132",
-    0x5F9A_1000: "DPPIC133",
-    0x5F9B_1000: "DPPIC134",
-    0x5F9C_1000: "DPPIC135",
-    0x5F9D_1000: "DPPIC136",
-}
-
-_IPCTS = {
-    0x5F8D_1000: "IPCT120",
-    0x5F92_1000: "IPCT130",
-}
-
-
-def lookup_periph_name(lut: dict[int, str], periph_addr: Address) -> str:
-    if name := lut.get(int(periph_addr.as_secure())):
-        return name
-    if name := lut.get(int(periph_addr.as_nonsecure())):
-        return name
-    return f"peripheral at {fmt_addr(int(periph_addr))}"
-
-
-class SpuPermSecuremapping(int, Enum):
-    NONSECURE = 0
-    SECURE = 1
-    USER_SELECTABLE = 2
-    SPLIT = 3
-
-
-class SpuPermDma(int, Enum):
-    NO_DMA = 0
-    NO_SEPARATE_ATTRIBUTE = 1
-    SEPARATE_ATTRIBUTE = 2
-
-
-def fmt_addr(addr: int) -> str:
-    return f"0x{addr:09_x}"
