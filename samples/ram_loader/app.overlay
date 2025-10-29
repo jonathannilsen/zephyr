@@ -1,0 +1,99 @@
+&usbhs {
+	status = "disabled";
+};
+
+&exmif {
+	status = "disabled";
+};
+
+&cpuapp_cpurad_ipc {
+	status = "disabled";
+};
+
+&cpurad_bellboard {
+	status = "disabled";
+};
+
+&canpll {
+	status = "disabled";
+};
+
+&can120 {
+	status = "disabled";
+};
+
+&adc {
+	status = "disabled";
+};
+
+&nfct {
+	status = "disabled";
+};
+
+&pwm130 {
+	status = "disabled";
+};
+
+&button0 {
+	status = "disabled";
+};
+
+&button1 {
+	status = "disabled";
+};
+
+&button2 {
+	status = "disabled";
+};
+
+&button3 {
+	status = "disabled";
+};
+
+&led0 {
+	status = "disabled";
+};
+
+&led1 {
+	status = "disabled";
+};
+
+&led2 {
+	status = "disabled";
+};
+
+&led3 {
+	status = "disabled";
+};
+
+&pwm_led2 {
+	status = "disabled";
+};
+
+&gdpwr {
+	status = "disabled";
+};
+
+&gpio_pad_group0 {
+	status = "disabled";
+};
+
+&gpio_pad_group1 {
+	status = "disabled";
+};
+
+&gpio_pad_group2 {
+	status = "disabled";
+};
+
+&gpio_pad_group6 {
+	status = "disabled";
+};
+
+&gpio_pad_group7 {
+	status = "disabled";
+};
+
+&gpio_pad_group9 {
+	status = "disabled";
+};

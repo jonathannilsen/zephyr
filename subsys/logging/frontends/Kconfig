@@ -118,17 +118,20 @@ if LOG_FRONTEND_STMESP_DEMUX
 config LOG_FRONTEND_STMESP_DEMUX_ACTIVE_PACKETS
 	int "Active packets"
 	default 12
+	# default 2048
 
 config LOG_FRONTEND_STMESP_DEMUX_BUFFER_SIZE
 	int "Buffer size"
-	default 1024
+	# default 1024
+	default 8192
+
 
 config LOG_FRONTEND_STMESP_DEMUX_MAX_UTILIZATION
 	bool "Track maximum utilization"
 
 config LOG_FRONTEND_STMESP_DEMUX_GC_TIMEOUT
 	int "Message timeout (in milliseconds)"
-	default 100
+	default 10000
 	help
 	  If log message is not completed within that time frame it is discarded.
 

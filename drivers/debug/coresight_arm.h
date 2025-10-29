@@ -52,6 +52,18 @@ extern "C" {
 #define ETR_DBAHI_OFFSET (0x11CUL) /* Data Buffer Address High Register */
 #define ETR_FFCR_OFFSET  (0x304UL) /* Formatter and Flush Control Register */
 
+/* ETB (Embedded Trace Buffer) register offsets */
+#define ETB_RDP_OFFSET  (0x004UL) /* RAM Depth Register */
+#define ETB_STS_OFFSET  (0x00CUL) /* Status Register */
+#define ETB_RRD_OFFSET  (0x010UL) /* RAM Read Data Register */
+#define ETB_RRP_OFFSET  (0x014UL) /* RAM Read Pointer Register */
+#define ETB_RWP_OFFSET  (0x018UL) /* RAM Write Pointer Register */
+#define ETB_TRG_OFFSET  (0x01CUL) /* Trigger Counter Register */
+#define ETB_CTL_OFFSET  (0x020UL) /* Control Register */
+#define ETB_RWD_OFFSET  (0x024UL) /* RAM Write Data Register */
+#define ETB_FFSR_OFFSET (0x300UL) /* Formatter and Flush Status Register */
+#define ETB_FFCR_OFFSET (0x304UL) /* Formatter and Flush Control Register */
+
 /* STM (System Trace Macrocell) register offsets */
 #define STM_STMHEER_OFFSET    (0xD00UL) /* Hardware Event Enable Register */
 #define STM_STMHEMCR_OFFSET   (0xD64UL) /* Hardware Event Master Control Register */

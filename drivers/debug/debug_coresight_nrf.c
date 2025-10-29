@@ -29,12 +29,15 @@ LOG_MODULE_REGISTER(cs_trace, CONFIG_DEBUG_CORESIGHT_NRF_LOG_LEVEL);
 
 #define ATBREPLICATOR_IDFILTER_FORWARD_STM                                                         \
 	BIT(CONFIG_DEBUG_CORESIGHT_NRF_ATB_TRACE_ID_STM_GLOBAL >> 4)
+
+#define ATBFUNNEL210_STM_ENS_MASK BIT(2)
 #define ATBFUNNEL211_STM_ENS_MASK BIT(2)
 
 enum coresight_nrf_mode {
 	CORESIGHT_NRF_MODE_UNCONFIGURED,
 	CORESIGHT_NRF_MODE_STM_TPIU,
 	CORESIGHT_NRF_MODE_STM_ETR,
+	CORESIGHT_NRF_MODE_STM_ETB,
 };
 
 struct coresight_nrf_config {
@@ -112,6 +115,37 @@ static void nrf_etr_init(uintptr_t buf, size_t buf_word_len)
 	coresight_lock(etr);
 
 	LOG_INF("Coresight Host ETR initialized");
+}
+
+#define CTI_CH_ETB_FORMATTER_STOP_OFFSET (0)
+
+static void nrf_cti_for_etb_init(void)
+{
+	// mem_addr_t cti211 = DT_REG_ADDR(DT_NODELABEL(cti211));
+
+	// coresight_unlock(cti211);
+
+	// /* Configure ETB formatter stop */
+	// sys_write32(cti211 + CTI_CTIOUTEN0_OFFSET, BIT(CTI_CH_ETB_FORMATTER_STOP_OFFSET));
+	// sys_write32(cti211 + CTI_CTIGATE_OFFSET, BIT(CTI_CH_ETB_FORMATTER_STOP_OFFSET));
+	// sys_write32(cti211 + CTI_CTICONTROL_OFFSET, 1);
+
+	// coresight_lock(cti211);
+}
+
+#define ETB_CTL_TRACE_CAPT_EN     (0)
+
+static void nrf_etb_init(void)
+{
+	mem_addr_t etb = DT_REG_ADDR(DT_NODELABEL(etb));
+
+	coresight_unlock(etb);
+
+	sys_write32(0, etb + ETB_FFCR_OFFSET);
+	sys_write32(0, etb + ETB_RWP_OFFSET);
+	sys_write32(BIT(ETB_CTL_TRACE_CAPT_EN), etb + ETB_CTL_OFFSET);
+
+	coresight_lock(etb);
 }
 
 static void nrf_stm_init(void)
@@ -222,6 +256,21 @@ static int coresight_nrf_init_stm_tpiu(void)
 	return 0;
 }
 
+static int coresight_nrf_init_stm_etb(void)
+{
+	mem_addr_t atbfunnel210 = DT_REG_ADDR(DT_NODELABEL(atbfunnel210));
+	mem_addr_t atbreplicator210 = DT_REG_ADDR(DT_NODELABEL(atbreplicator210));
+
+	nrf_atbfunnel_init(atbfunnel210, ATBFUNNEL210_STM_ENS_MASK);
+	nrf_atbreplicator_init(atbreplicator210, ATBREPLICATOR_IDFILTER_FORWARD_STM, true, false);
+
+	nrf_tsgen_init();
+	nrf_etb_init();
+	nrf_stm_init();
+
+	return 0;
+}
+
 static int coresight_nrf_init(const struct device *dev)
 {
 	int err;
@@ -253,6 +302,9 @@ static int coresight_nrf_init(const struct device *dev)
 		size_t buf_word_len = DT_REG_SIZE(DT_NODELABEL(etr_buffer)) / sizeof(uint32_t);
 
 		return coresight_nrf_init_stm_etr(etr_buffer, buf_word_len);
+	}
+	case CORESIGHT_NRF_MODE_STM_ETB: {
+		return coresight_nrf_init_stm_etb();
 	}
 	default: {
 		LOG_ERR("Unsupported Coresight mode");

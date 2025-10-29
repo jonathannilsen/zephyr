@@ -455,7 +455,7 @@ const char *log_frontend_stmesp_demux_str_get(uint32_t m_id, uint16_t s_id)
 
 int log_frontend_stmesp_demux_packet_start(uint32_t *data, uint64_t *ts)
 {
-	if (skip) {
+	if (skip || data == NULL) {
 		return 0;
 	}
 

@@ -1,7 +1,15 @@
 # Copyright (c) 2024 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
-DT_COMPAT_NORDIC_NRF_TBM := nordic,nrf-tbm
+config DEBUG_NRF_ETB
+	bool "TODO"
+	imply UART_ASYNC_API
+	select MIPI_STP_DECODER
+	select LOG_FRONTEND_STMESP_DEMUX
+	select LOG_OUTPUT
+	imply LOG_BACKEND_SHOW_COLOR
+	# TODO remove
+	imply LOG_FRONTEND_STMESP_FSC
 
 config DEBUG_NRF_ETR
 	bool "Coresight ETR handler (with Nordic TBM)"
