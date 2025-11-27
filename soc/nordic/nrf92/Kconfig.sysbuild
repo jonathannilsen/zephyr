@@ -1,6 +1,9 @@
 # Copyright (c) 2025 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
+config HAS_IRONSIDE_SE
+	def_bool y
+
 if SOC_NRF9280_CPUPPR
 
 config HAS_NORDIC_VPR_LAUNCHER_IMAGE

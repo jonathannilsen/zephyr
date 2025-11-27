@@ -9,7 +9,7 @@
 #include <zephyr/drivers/pinctrl.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/sys_io.h>
-#include <nrf_ironside/tdd.h>
+#include <ironside/se/api.h>
 #include <uicr/uicr.h>
 
 #undef ETR_MODE_MODE_CIRCULARBUF
