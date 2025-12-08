@@ -260,4 +260,3 @@ endmenu # HAS_NORDIC_DRIVERS
 
 rsource "nrfs/Kconfig"
 rsource "nrfx/Kconfig"
-rsource "Kconfig.nrf_regtool"

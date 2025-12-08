@@ -341,24 +341,12 @@ class NrfBinaryRunner(ZephyrBinaryRunner):
         if self.family in ('nrf54h', 'nrf92'):
             erase_arg = 'ERASE_NONE'
 
-            regtool_generated_uicr = self.build_conf.getboolean('CONFIG_NRF_REGTOOL_GENERATE_UICR')
-
-            if regtool_generated_uicr and not self.hex_get_uicrs().get(core):
-                raise RuntimeError(
-                    f"Expected a UICR to be contained in: {self.hex_}\n"
-                    "Please ensure that the correct version of nrf-regtool is "
-                    "installed, then run 'west build --cmake' to try again."
-                )
-
             if self.erase:
                 if self.family == 'nrf54h':
                     self.exec_op('erase', kind='all')
                 else:
                     self.exec_op('erase', core='Application', kind='all')
                     self.exec_op('erase', core='Network', kind='all')
-
-            if not self.erase and regtool_generated_uicr:
-                self.exec_op('erase', core=core, kind='uicr')
         else:
             erase_mode = self._get_erase_mode(self.erase_mode)
             if self.erase:
