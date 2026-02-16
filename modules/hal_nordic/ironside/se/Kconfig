@@ -71,6 +71,8 @@ config NRF_PERIPHCONF_SECTION_KEEP
 	default y if NRF_PERIPHCONF_SECTION_KEEP_BY_DEFAULT
 	help
 	  Keep the PERIPHCONF section as data in the firmware binary.
+	  If the UICR generator image is enabled, setting this option also excludes
+	  the section from the generated UICR PERIPHCONF blob.
 
 config NRF_PERIPHCONF_GENERATE_ENTRIES
 	bool "Generate PERIPHCONF entries source file"
